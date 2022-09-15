@@ -49,17 +49,18 @@ class My_Dataset(Dataset):
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 model =  My_Model(32, 2).to(device)
 
+epoch_n = 50000
+bs = 16
+lr_rate = 1e-5
+criterion = nn.MSELoss(reduction='mean')
+optimizer = torch.optim.AdamW(model.parameters(), lr=lr_rate)
+
 wandb.init(
       # Set the project where this run will be logged
-      project="ML2022Spring_HW3",
-      name= '{} bat={} L={} lr={} wd={} {}'.format(myseed, batch_size, n_layer, lr_rate, weight_decay, _exp_name)
+      project="Explain AI",
+      name= '{} bat={} lr={} epo={}'.format('test', bs, lr_rate, epoch_n)
     )
-    wandb.watch(model)
-
-criterion = nn.MSELoss(reduction='mean')
-optimizer = torch.optim.AdamW(model.parameters(), lr=1e-5)
-epoch_n = 300
-bs = 16
+wandb.watch(model)
 
 train_dataset = My_Dataset(data["x_train"], data["y_train"])
 train_loader = DataLoader(train_dataset, batch_size=bs, shuffle=True)
@@ -81,6 +82,8 @@ for epoch in range(epoch_n):
     if (epoch+1) % 10 == 0:
         mean_train_loss = sum(loss_record)/len(loss_record)
         loss_plot.append(mean_train_loss)  # plot loss
+        wandb.log({'Loss': mean_train_loss, 'epoch':epoch})
 
-plt.plot(range(len(loss_plot)), loss_plot)
-plt.show()
+wandb.finish()
+
+torch.save(model.state_dict(), "My_Model")
