@@ -1,10 +1,11 @@
 import json 
-import wandb
+import wandb 
+import numpy as np 
 
 # Pytorch
 import torch
 import torch.nn as nn
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import Dataset, DataLoader, random_split
 
 with open('dataset/dataset.json') as f:
     data = json.load(f)
@@ -26,7 +27,7 @@ class My_Model(nn.Module):
         x = self.layers(x)
         return x
 
-
+pow = 0.9
 class My_Dataset(Dataset):
     '''
     x: Features.
@@ -40,37 +41,52 @@ class My_Dataset(Dataset):
     def __getitem__(self, idx):
         x = self.x[idx]
         y = self.y[idx]
+        y[y<0] = -np.power(-y[y<0], pow)
+        y[y>0] = np.power(y[y>0], pow)
+        # print(y)
+        # .astype('float32')
         # y = np.tanh(self.y[idx])
         return x, y
 
     def __len__(self):
         return len(self.y)
 
+def train_valid_split(data_set, valid_ratio):
+    '''Split provided training data into training set and validation set'''
+    valid_set_size = int(valid_ratio * len(data_set)) 
+    train_set_size = len(data_set) - valid_set_size
+    return random_split(data_set, [train_set_size, valid_set_size])
+
+log = True
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 model =  My_Model(32, 2).to(device)
 
-epoch_n = 50000
+epoch_n = 5000
 bs = 16
 lr_rate = 1e-5
 criterion = nn.MSELoss(reduction='mean')
 optimizer = torch.optim.AdamW(model.parameters(), lr=lr_rate)
 
-wandb.init(
-      # Set the project where this run will be logged
-      project="Explain AI",
-      name= '{} bat={} lr={} epo={}'.format('test', bs, lr_rate, epoch_n)
-    )
-wandb.watch(model)
+if log:
+    wandb.init(
+        # Set the project where this run will be logged
+        project="Explain AI",
+        name= 'pow={} bat={} lr={} epo={}'.format(pow, bs, lr_rate, epoch_n)
+        )
+    wandb.watch(model)
 
-train_dataset = My_Dataset(data["x_train"], data["y_train"])
-train_loader = DataLoader(train_dataset, batch_size=bs, shuffle=True)
-model.train()
-loss_record = []
-loss_plot = []
+dataset = My_Dataset(data["x_train"], data["y_train"])
+train_data, valid_data = train_valid_split(dataset, 0.2)
+print(len(train_data), len(valid_data))
+train_loader = DataLoader(train_data, batch_size=bs, shuffle=True)
+valid_loader = DataLoader(valid_data, batch_size=bs, shuffle=True)
+
 
 for epoch in range(epoch_n):
+    model.train()
+    loss_record = []
     for x, y in train_loader:
-        x = x.to(device)
+        x, y = x.to(device), y.to(device)
         output = model(x)
         loss = criterion(output, y)
         # Compute gradient(backpropagation).
@@ -81,9 +97,28 @@ for epoch in range(epoch_n):
     
     if (epoch+1) % 10 == 0:
         mean_train_loss = sum(loss_record)/len(loss_record)
-        loss_plot.append(mean_train_loss)  # plot loss
-        wandb.log({'Loss': mean_train_loss, 'epoch':epoch})
+        if log:
+            wandb.log({'Train Loss': mean_train_loss, 'epoch':epoch})
 
-wandb.finish()
+    model.eval()
+    loss_record = []
+    for x, y in valid_loader:
+        x, y = x.to(device), y.to(device)
+        with torch.no_grad():
+            pred = model(x)
+            pred[pred>0] = 1
+            pred[pred<0] = -1
+            y[y>0]=1
+            y[y<0]=-1
+            loss = criterion(pred, y)
+
+        loss_record.append(loss.item())
+        
+    if (epoch+1) % 10 == 0:
+        mean_valid_loss = sum(loss_record)/len(loss_record)
+        if log:
+            wandb.log({'Valid Loss': mean_valid_loss, 'epoch':epoch})
+
+if log: wandb.finish()
 
 torch.save(model.state_dict(), "My_Model")
