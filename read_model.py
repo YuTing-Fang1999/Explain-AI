@@ -48,21 +48,22 @@ with open('dataset/dataset.json') as f:
 
 x_train = data["x_train"]
 y_train = data["y_train"]
+
 acc = 0
-for i in range(200):
+for i in range(len(y_train)):
     pred = model(torch.FloatTensor(x_train[i])).detach().numpy()
     b = pred * y_train[i] >=0
-    # print(np.sum(b.astype(int)))
+    # print(b)
     acc+=np.sum(b.astype(int))
     # print(x_train[i][-7:])
     # print(y_train[i])
     # print(model(torch.FloatTensor(x_train[i])))
     # print()
-print(acc/400)
+print(acc/(len(y_train)*2))
 
-criterion = nn.MSELoss(reduction='mean')
-print(criterion(torch.FloatTensor([0]),torch.FloatTensor([1])))
-print(criterion(torch.FloatTensor([1]),torch.FloatTensor([0])))
-print(criterion(torch.FloatTensor([0]),torch.FloatTensor([0])))
-print(criterion(torch.FloatTensor([1]),torch.FloatTensor([1])))
+# criterion = nn.MSELoss(reduction='mean')
+# print(criterion(torch.FloatTensor([0]),torch.FloatTensor([1])))
+# print(criterion(torch.FloatTensor([1]),torch.FloatTensor([0])))
+# print(criterion(torch.FloatTensor([0]),torch.FloatTensor([0])))
+# print(criterion(torch.FloatTensor([1]),torch.FloatTensor([1])))
 

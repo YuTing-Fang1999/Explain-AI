@@ -27,7 +27,7 @@ class My_Model(nn.Module):
         x = self.layers(x)
         return x
 
-pow = 0.9
+pow = 0.7
 class My_Dataset(Dataset):
     '''
     x: Features.
@@ -61,8 +61,8 @@ log = True
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 model =  My_Model(32, 2).to(device)
 
-epoch_n = 5000
-bs = 16
+epoch_n = 200
+bs = 1
 lr_rate = 1e-5
 criterion = nn.MSELoss(reduction='mean')
 optimizer = torch.optim.AdamW(model.parameters(), lr=lr_rate)
@@ -75,50 +75,64 @@ if log:
         )
     wandb.watch(model)
 
-dataset = My_Dataset(data["x_train"], data["y_train"])
-train_data, valid_data = train_valid_split(dataset, 0.2)
-print(len(train_data), len(valid_data))
-train_loader = DataLoader(train_data, batch_size=bs, shuffle=True)
-valid_loader = DataLoader(valid_data, batch_size=bs, shuffle=True)
+# dataset = My_Dataset(data["x_train"], data["y_train"])
+# train_data, valid_data = train_valid_split(dataset, 0.3)
+# print(train_data[:30][0].shape, train_data[:30][1].shape)
+# print(train_data[:][0].shape, train_data[:][1].shape)
+# print(len(train_data), len(valid_data))
+# train_loader = DataLoader(train_data, batch_size=bs, shuffle=True)
+# valid_loader = DataLoader(valid_data, batch_size=bs, shuffle=True)
 
+acc = []
+for i in range(30,100):
+    dataset = My_Dataset(data["x_train"][:i], data["y_train"][:i])
+    train_loader = DataLoader(dataset, batch_size=bs, shuffle=True)
 
-for epoch in range(epoch_n):
     model.train()
     loss_record = []
-    for x, y in train_loader:
-        x, y = x.to(device), y.to(device)
-        output = model(x)
-        loss = criterion(output, y)
-        # Compute gradient(backpropagation).
-        loss.backward()
-        # Update parameters.
-        optimizer.step()
-        loss_record.append(loss.detach().item())
-    
-    if (epoch+1) % 10 == 0:
-        mean_train_loss = sum(loss_record)/len(loss_record)
-        if log:
-            wandb.log({'Train Loss': mean_train_loss, 'epoch':epoch})
-
-    model.eval()
-    loss_record = []
-    for x, y in valid_loader:
-        x, y = x.to(device), y.to(device)
-        with torch.no_grad():
-            pred = model(x)
-            pred[pred>0] = 1
-            pred[pred<0] = -1
-            y[y>0]=1
-            y[y<0]=-1
-            loss = criterion(pred, y)
-
-        loss_record.append(loss.item())
+    for epoch in range(epoch_n):
         
-    if (epoch+1) % 10 == 0:
-        mean_valid_loss = sum(loss_record)/len(loss_record)
-        if log:
-            wandb.log({'Valid Loss': mean_valid_loss, 'epoch':epoch})
+        for x, y in train_loader:
+            # print(x.shape, y.shape)
+            x, y = x.to(device), y.to(device)
+            output = model(x)
+            loss = criterion(output, y)
+            # Compute gradient(backpropagation).
+            loss.backward()
+            # Update parameters.
+            optimizer.step()
+            loss_record.append(loss.detach().item())
+        
+        # if (epoch+1) % 10 == 0:
+    mean_train_loss = sum(loss_record)/len(loss_record)
+    if log:
+        wandb.log({'Train Loss': mean_train_loss, 'i':i-30})
 
+    if i>50: #pred
+        pred = model(torch.FloatTensor(data["x_train"][i])).detach().numpy()
+        b = pred * data["y_train"][i] >=0
+        acc.append(b.astype(int))
+        # model.eval()
+        # loss_record = []
+        # for x, y in valid_loader:
+        #     x, y = x.to(device), y.to(device)
+        #     with torch.no_grad():
+        #         pred = model(x)
+        #         pred[pred>0] = 1
+        #         pred[pred<0] = -1
+        #         y[y>0]=1
+        #         y[y<0]=-1
+        #         loss = criterion(pred, y)
+
+        #     loss_record.append(loss.item())
+            
+        # if (epoch+1) % 10 == 0:
+        #     mean_valid_loss = sum(loss_record)/len(loss_record)
+        #     if log:
+        #         wandb.log({'Valid Loss': mean_valid_loss, 'epoch':epoch})
+print(np.array(acc).mean())
+if log:
+    wandb.log({'acc': np.array(acc).mean()})
 if log: wandb.finish()
 
 torch.save(model.state_dict(), "My_Model")
