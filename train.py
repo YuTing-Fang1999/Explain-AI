@@ -14,20 +14,22 @@ class My_Model(nn.Module):
     def __init__(self, input_dim, output_dim):
         super(My_Model, self).__init__()
         self.layers = nn.Sequential(
-            nn.Linear(input_dim, 16, bias=False),
+            nn.Linear(input_dim, input_dim, bias=False),
             nn.ReLU(),
-            nn.Linear(16, 32, bias=False),
+            nn.Linear(input_dim, input_dim, bias=False),
             nn.ReLU(),
-            nn.Linear(32, 16, bias=False),
+            nn.Linear(input_dim, input_dim, bias=False),
             nn.ReLU(),
-            nn.Linear(16, output_dim, bias=False),
+            # nn.Linear(32, 16, bias=False),
+            # nn.ReLU(),
+            nn.Linear(input_dim, output_dim, bias=False),
         )
 
     def forward(self, x):
         x = self.layers(x)
         return x
 
-pow = 0.7
+pow = 1
 class My_Dataset(Dataset):
     '''
     x: Features.
@@ -62,7 +64,7 @@ device = 'cuda' if torch.cuda.is_available() else 'cpu'
 model =  My_Model(32, 2).to(device)
 
 epoch_n = 200
-bs = 1
+bs = 64
 lr_rate = 1e-5
 criterion = nn.MSELoss(reduction='mean')
 optimizer = torch.optim.AdamW(model.parameters(), lr=lr_rate)
@@ -84,7 +86,7 @@ if log:
 # valid_loader = DataLoader(valid_data, batch_size=bs, shuffle=True)
 
 acc = []
-for i in range(30,100):
+for i in range(30,len(data["y_train"])):
     dataset = My_Dataset(data["x_train"][:i], data["y_train"][:i])
     train_loader = DataLoader(dataset, batch_size=bs, shuffle=True)
 
@@ -109,9 +111,20 @@ for i in range(30,100):
         wandb.log({'Train Loss': mean_train_loss, 'i':i-30})
 
     if i>50: #pred
-        pred = model(torch.FloatTensor(data["x_train"][i])).detach().numpy()
-        b = pred * data["y_train"][i] >=0
-        acc.append(b.astype(int))
+        model.eval()
+        with torch.no_grad():
+            pred = model(torch.FloatTensor(data["x_train"][i])).detach().numpy()
+            b = pred * data["y_train"][i] >= 0
+            print(data["x_train"][i][-7:])
+            print(data["y_train"][i])
+            print(pred)
+            print(b.astype(int))
+            
+            acc.append(b.astype(int))
+            print(np.array(acc).mean())
+            print()
+            if log:
+                wandb.log({'acc': np.array(acc).mean()})
         # model.eval()
         # loss_record = []
         # for x, y in valid_loader:
@@ -131,8 +144,7 @@ for i in range(30,100):
         #     if log:
         #         wandb.log({'Valid Loss': mean_valid_loss, 'epoch':epoch})
 print(np.array(acc).mean())
-if log:
-    wandb.log({'acc': np.array(acc).mean()})
+
 if log: wandb.finish()
 
 torch.save(model.state_dict(), "My_Model")

@@ -8,13 +8,22 @@ class My_Model(nn.Module):
     def __init__(self, input_dim, output_dim):
         super(My_Model, self).__init__()
         self.layers = nn.Sequential(
-            nn.Linear(input_dim, 16, bias=False),
+            # nn.Linear(input_dim, 16, bias=False),
+            # nn.ReLU(),
+            # nn.Linear(16, 32),
+            # nn.ReLU(),
+            # nn.Linear(32, 16),
+            # nn.ReLU(),
+            # nn.Linear(16, output_dim),
+            nn.Linear(input_dim, input_dim, bias=False),
             nn.ReLU(),
-            nn.Linear(16, 32, bias=False),
+            nn.Linear(input_dim, input_dim, bias=False),
             nn.ReLU(),
-            nn.Linear(32, 16, bias=False),
-            nn.ReLU(),
-            nn.Linear(16, output_dim, bias=False),
+            # nn.Linear(input_dim, input_dim, bias=False),
+            # nn.ReLU(),
+            # nn.Linear(32, 16, bias=False),
+            # nn.ReLU(),
+            nn.Linear(input_dim, output_dim, bias=False),
         )
 
     def forward(self, x):
@@ -30,9 +39,9 @@ model.eval()
 #     x[i] = 1
 #     print(model(torch.FloatTensor(x)))
 
-# x = np.zeros(32)
+x = np.zeros(32)
 # x[30] = 1
-# print(model(torch.FloatTensor(x)))
+print(model(torch.FloatTensor(x)))
 
 # x = np.zeros(32)
 # x[31] = 1
@@ -49,17 +58,17 @@ with open('dataset/dataset.json') as f:
 x_train = data["x_train"]
 y_train = data["y_train"]
 
-acc = 0
+acc = []
 for i in range(len(y_train)):
     pred = model(torch.FloatTensor(x_train[i])).detach().numpy()
     b = pred * y_train[i] >=0
     # print(b)
-    acc+=np.sum(b.astype(int))
+    acc.append(b.astype(int))
     # print(x_train[i][-7:])
     # print(y_train[i])
     # print(model(torch.FloatTensor(x_train[i])))
     # print()
-print(acc/(len(y_train)*2))
+print(np.array(acc).mean())
 
 # criterion = nn.MSELoss(reduction='mean')
 # print(criterion(torch.FloatTensor([0]),torch.FloatTensor([1])))
