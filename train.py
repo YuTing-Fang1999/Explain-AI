@@ -1,4 +1,5 @@
-import json 
+import json
+from select import select 
 import wandb 
 import numpy as np 
 
@@ -6,30 +7,23 @@ import numpy as np
 import torch
 import torch.nn as nn
 from torch.utils.data import Dataset, DataLoader, random_split
+from model import My_Model
 
 with open('dataset/dataset.json') as f:
     data = json.load(f)
 
-class My_Model(nn.Module):
-    def __init__(self, input_dim, output_dim):
-        super(My_Model, self).__init__()
-        self.layers = nn.Sequential(
-            nn.Linear(input_dim, input_dim, bias=False),
-            nn.ReLU(),
-            nn.Linear(input_dim, input_dim, bias=False),
-            nn.ReLU(),
-            nn.Linear(input_dim, input_dim, bias=False),
-            nn.ReLU(),
-            # nn.Linear(32, 16, bias=False),
-            # nn.ReLU(),
-            nn.Linear(input_dim, output_dim, bias=False),
-        )
+select_threshold = 0.5
+# clean data
+x_train = []
+y_train = []
+data["y_train"] = np.array(data["y_train"])
+for i in range(len(data["y_train"])):
+    if (np.abs(data["y_train"][i]) >=0.5).any():
+        x_train.append(data["x_train"][i])
+        y_train.append(list(data["y_train"][i]))
 
-    def forward(self, x):
-        x = self.layers(x)
-        return x
-
-pow = 1
+pow = 0.7
+zero_threshold = 0.3
 class My_Dataset(Dataset):
     '''
     x: Features.
@@ -43,8 +37,15 @@ class My_Dataset(Dataset):
     def __getitem__(self, idx):
         x = self.x[idx]
         y = self.y[idx]
-        y[y<0] = -np.power(-y[y<0], pow)
-        y[y>0] = np.power(y[y>0], pow)
+        # print(y)
+        sign = y<0
+        y = np.around(np.abs(y), 5)
+        y = np.power(y, pow)
+        
+        y[y<zero_threshold] = 0
+        y[sign] = -y[sign]
+        # print(y)
+        
         # print(y)
         # .astype('float32')
         # y = np.tanh(self.y[idx])
@@ -64,16 +65,26 @@ device = 'cuda' if torch.cuda.is_available() else 'cpu'
 model =  My_Model(32, 2).to(device)
 
 epoch_n = 200
-bs = 64
+bs = 16
 lr_rate = 1e-5
 criterion = nn.MSELoss(reduction='mean')
 optimizer = torch.optim.AdamW(model.parameters(), lr=lr_rate)
 
 if log:
+    config = dict (
+        pow = pow,
+        learning_rate = lr_rate,
+        batch_size = bs,
+        epoch = epoch_n,
+        select_threshold = select_threshold,
+        zero_threshold = zero_threshold
+        )
+
     wandb.init(
         # Set the project where this run will be logged
         project="Explain AI",
-        name= 'pow={} bat={} lr={} epo={}'.format(pow, bs, lr_rate, epoch_n)
+        name= 'pow={} bat={} lr={} epo={} s={} z={}'.format(pow, bs, lr_rate, epoch_n, select_threshold, zero_threshold),
+        config=config
         )
     wandb.watch(model)
 
@@ -86,8 +97,8 @@ if log:
 # valid_loader = DataLoader(valid_data, batch_size=bs, shuffle=True)
 
 acc = []
-for i in range(30,len(data["y_train"])):
-    dataset = My_Dataset(data["x_train"][:i], data["y_train"][:i])
+for i in range(30,len(y_train)):
+    dataset = My_Dataset(x_train[:i], y_train[:i])
     train_loader = DataLoader(dataset, batch_size=bs, shuffle=True)
 
     model.train()
@@ -113,10 +124,12 @@ for i in range(30,len(data["y_train"])):
     if i>50: #pred
         model.eval()
         with torch.no_grad():
-            pred = model(torch.FloatTensor(data["x_train"][i])).detach().numpy()
-            b = pred * data["y_train"][i] >= 0
-            print(data["x_train"][i][-7:])
-            print(data["y_train"][i])
+            pred = model(torch.FloatTensor(x_train[i])).detach().numpy()
+            pred[np.abs(pred)<zero_threshold] = 0
+
+            b = pred * y_train[i] >= 0
+            print(x_train[i][-7:])
+            print(y_train[i])
             print(pred)
             print(b.astype(int))
             
@@ -144,6 +157,7 @@ for i in range(30,len(data["y_train"])):
         #     if log:
         #         wandb.log({'Valid Loss': mean_valid_loss, 'epoch':epoch})
 print(np.array(acc).mean())
+print(model) 
 
 if log: wandb.finish()
 

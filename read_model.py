@@ -3,36 +3,14 @@ import torch
 import torch.nn as nn
 import numpy as np
 import json
+from model import My_Model
 
-class My_Model(nn.Module):
-    def __init__(self, input_dim, output_dim):
-        super(My_Model, self).__init__()
-        self.layers = nn.Sequential(
-            # nn.Linear(input_dim, 16, bias=False),
-            # nn.ReLU(),
-            # nn.Linear(16, 32),
-            # nn.ReLU(),
-            # nn.Linear(32, 16),
-            # nn.ReLU(),
-            # nn.Linear(16, output_dim),
-            nn.Linear(input_dim, input_dim, bias=False),
-            nn.ReLU(),
-            nn.Linear(input_dim, input_dim, bias=False),
-            nn.ReLU(),
-            # nn.Linear(input_dim, input_dim, bias=False),
-            # nn.ReLU(),
-            # nn.Linear(32, 16, bias=False),
-            # nn.ReLU(),
-            nn.Linear(input_dim, output_dim, bias=False),
-        )
-
-    def forward(self, x):
-        x = self.layers(x)
-        return x
 
 model = My_Model(32, 2)
 model.load_state_dict(torch.load("My_Model"))
 model.eval()
+
+
 
 # for i in range(32):
 #     x = np.zeros(32)
@@ -61,6 +39,7 @@ y_train = data["y_train"]
 acc = []
 for i in range(len(y_train)):
     pred = model(torch.FloatTensor(x_train[i])).detach().numpy()
+    pred[np.abs(pred)<0.05] = 0
     b = pred * y_train[i] >=0
     # print(b)
     acc.append(b.astype(int))
