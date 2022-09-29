@@ -12,18 +12,18 @@ from model import My_Model
 with open('dataset/dataset.json') as f:
     data = json.load(f)
 
-select_threshold = 0.5
+select_threshold = 0
 # clean data
 x_train = []
 y_train = []
 data["y_train"] = np.array(data["y_train"])
 for i in range(len(data["y_train"])):
-    if (np.abs(data["y_train"][i]) >=0.5).any():
+    if (np.abs(data["y_train"][i]) >=select_threshold).any():
         x_train.append(data["x_train"][i])
         y_train.append(list(data["y_train"][i]))
 
-pow = 0.7
-zero_threshold = 0.3
+pow = 0.9
+zero_threshold = 0
 class My_Dataset(Dataset):
     '''
     x: Features.
@@ -40,9 +40,9 @@ class My_Dataset(Dataset):
         # print(y)
         sign = y<0
         y = np.around(np.abs(y), 5)
-        y = np.power(y, pow)
-        
         y[y<zero_threshold] = 0
+
+        y = np.power(y, pow)
         y[sign] = -y[sign]
         # print(y)
         
@@ -77,7 +77,8 @@ if log:
         batch_size = bs,
         epoch = epoch_n,
         select_threshold = select_threshold,
-        zero_threshold = zero_threshold
+        zero_threshold = zero_threshold,
+        model = 'narrow'
         )
 
     wandb.init(
@@ -136,8 +137,7 @@ for i in range(30,len(y_train)):
             acc.append(b.astype(int))
             print(np.array(acc).mean())
             print()
-            if log:
-                wandb.log({'acc': np.array(acc).mean()})
+            if log: wandb.log({'acc': np.array(acc).mean()})
         # model.eval()
         # loss_record = []
         # for x, y in valid_loader:

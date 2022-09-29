@@ -40,7 +40,7 @@ acc = []
 for i in range(len(y_train)):
     pred = model(torch.FloatTensor(x_train[i])).detach().numpy()
     pred[np.abs(pred)<0.05] = 0
-    b = pred * y_train[i] >=0
+    b = pred * y_train[i] >= 0
     # print(b)
     acc.append(b.astype(int))
     # print(x_train[i][-7:])
